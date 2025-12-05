@@ -9,7 +9,7 @@ import tempretures from "../data/tempretures.json";
 import bases from "../data/bases.json";
 import syrups from "../data/syrups.json";
 import creamers from "../data/creamers.json";
-import db from "../firebase.ts";
+import { db } from "../firebase.ts";
 import {
   collection,
   getDocs,
@@ -23,6 +23,7 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
+
 
 export const useBeverageStore = defineStore("BeverageStore", {
   state: () => ({
@@ -145,7 +146,64 @@ export const useBeverageStore = defineStore("BeverageStore", {
         this.currentSyrup
       );
     },
-    makeBeverage() {},
-    setUser(user: User | null) {},
+    makeBeverage() {
+      if (!this.user) {
+        return "No user logged in, please sign in first."
+      }
+
+      if (!this.currentName || !this.currentTemp || !this.currentBase || !this.currentSyrup || !this.currentCreamer) {
+          return "Please complete all beverage options and the name before making a beverage."
+      }
+      const newBeverage: BeverageType = {
+        name: this.currentName,
+        base: this.currentBase,
+        temp: this.currentTemp,
+        syrup: this.currentSyrup,
+        creamer: this.currentCreamer,
+        id: crypto.randomUUID(),
+        uid: this.user.uid
+      };
+
+      const beverageDoc = doc(db, "beverages",newBeverage.id);
+      setDoc(beverageDoc,newBeverage)
+
+      this.beverages.push(newBeverage)
+      this.currentBeverage = newBeverage
+
+      return `Beverage ${newBeverage.name} created successfully!`;
+
+    },
+    
+      
+
+    setUser(user: User | null) {
+      this.user = user
+      if (this.snapshotUnsubscribe) {
+        this.snapshotUnsubscribe();
+        this.snapshotUnsubscribe = null;
+      }
+
+      this.beverages = [];
+      this.currentBeverage = null;
+
+      if (!user) {
+        return;
+      }
+
+      const beveragesRef = collection(db,"beverages");
+      const q = query(beveragesRef, where("uid","==",user.uid));
+
+      this.snapshotUnsubscribe = onSnapshot(q,(snapshot) => {
+        const userBev: BeverageType[] = []
+        snapshot.forEach((doc) => {
+          userBev.push(doc.data() as BeverageType);
+        });
+        
+        this.beverages = userBev;
+        this.currentBeverage = userBev[0]
+      });
+
+
+    },
   },
 });
