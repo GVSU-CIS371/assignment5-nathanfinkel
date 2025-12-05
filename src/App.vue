@@ -71,7 +71,12 @@
     </ul>
 
     <div class="auth-row">
-      <button @click="withGoogle">Sign in with Google</button>
+      <template v-if="!beverageStore.user">
+        <button @click="withGoogle">Sign in with Google</button>
+      </template>
+      <template v-else>
+        <button @click="SignOutUser">Sign out</button>
+      </template>
     </div>
     <input
       v-model="beverageStore.currentName"
@@ -79,7 +84,7 @@
       placeholder="Beverage Name"
     />
 
-    <button @click="handleMakeBeverage">🍺 Make Beverage</button>
+    <button @click="handleMakeBeverage" :disabled="!beverageStore.user">🍺 Make Beverage</button>
 
     <p v-if="message" class="status-message">
       {{ message }}
@@ -104,11 +109,21 @@
 import { ref } from "vue";
 import Beverage from "./components/Beverage.vue";
 import { useBeverageStore } from "./stores/beverageStore";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+
 
 const beverageStore = useBeverageStore();
 beverageStore.init();
 
 const message = ref("");
+
+const auth = getAuth();
+onAuthStateChanged(auth, (user) => {
+  beverageStore.setUser(user);
+  if (user) {
+  } else {
+  }
+});
 
 const showMessage = (txt: string) => {
   message.value = txt;
@@ -117,7 +132,28 @@ const showMessage = (txt: string) => {
   }, 5000);
 };
 
-const withGoogle = async () => {};
+const withGoogle = async () => {
+  try{
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user
+    beverageStore.setUser(user);
+    showMessage('signed in')
+  } catch(error: any){
+    console.error(error);
+    showMessage('Sign in failed. ${error.message}');
+  }
+};
+const SignOutUser = async () => {
+  try{
+    await signOut(auth);
+    showMessage("Signed Out.")
+    beverageStore.setUser(null);
+  } catch (error: any){
+    console.error(error);
+    showMessage('signout failed.')
+  }
+}
 
 const handleMakeBeverage = () => {
   const txt = beverageStore.makeBeverage();
